@@ -36,8 +36,15 @@ class FaceCameraController extends CameraController {
   var isChecking = false;
 
   @override
-  Future<void> initialize() async {
+  Future<void> initialize({
+    bool initializeProccessImage = true,
+    Duration delay = const Duration(milliseconds: 100),
+  }) async {
     await super.initialize();
+
+    if (!initializeProccessImage) {
+      return;
+    }
 
     await startImageStream((image) async {
       if (!isChecking) {
@@ -47,7 +54,7 @@ class FaceCameraController extends CameraController {
         final faces =
             await Future.microtask(() => _detector.processImage(visionImage));
         _inputImageController.add(faces);
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future.delayed(delay);
         isChecking = false;
       }
     });

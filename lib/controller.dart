@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
@@ -22,7 +24,9 @@ class FaceCameraController extends CameraController {
   late final FaceDetector _detector;
 
   Stream<FaceState> get stream =>
-      _inputImageController.stream.map((faces) => switch (faces.length) {
+      _inputImageController.stream.transform(StreamTransformer.fromHandlers(
+        handleData: (faces, sink) {
+          sink.add(switch (faces.length) {
             0 => const EmptyFaceState(),
             1 => SingleFaceState.fromFace(faces.first),
             _ => MultiFaceState(
@@ -30,6 +34,8 @@ class FaceCameraController extends CameraController {
                 faces: [...faces.map(SingleFaceState.fromFace)],
               ),
           });
+        },
+      ));
 
   var isChecking = false;
 
@@ -47,43 +53,44 @@ class FaceCameraController extends CameraController {
     await startImageStream((image) async {
       if (!isChecking) {
         isChecking = true;
-        final visionImage = _visionImage(image, description);
+        final visionImage = _inputImageFromCameraImage(image);
 
-        final faces =
-            await Future.microtask(() => _detector.processImage(visionImage));
-        _inputImageController.add(faces);
-        await Future.delayed(delay);
-        isChecking = false;
+        if (visionImage == null) {
+          isChecking = false;
+          return;
+        }
+
+        try {
+          final faces =
+              await Future.microtask(() => _detector.processImage(visionImage));
+          _inputImageController.add(faces);
+          await Future.delayed(delay);
+        } finally {
+          isChecking = false;
+        }
       }
     });
   }
 
-  InputImage _visionImage(CameraImage image, CameraDescription description) {
-    final plane = image.planes.first;
+  InputImage? _inputImageFromCameraImage(CameraImage image) {
+    final rotation =
+        InputImageRotationValue.fromRawValue(description.sensorOrientation);
+    if (rotation == null) return null;
 
-    final bytes = plane.bytes;
+    final format = InputImageFormatValue.fromRawValue(image.format.raw);
+    if (format == null && Platform.isIOS) return null;
 
-    final imageSize = Size(image.width.toDouble(), image.height.toDouble());
+    final plane = [...image.planes.expand((element) => element.bytes)];
 
-    final imageRotation =
-        InputImageRotationValue.fromRawValue(description.sensorOrientation) ??
-            InputImageRotation.rotation0deg;
-
-    final inputImageFormat =
-        InputImageFormatValue.fromRawValue(image.format.raw) ??
-            InputImageFormat.nv21;
-
-    final visionImage = InputImage.fromBytes(
-      bytes: bytes,
+    return InputImage.fromBytes(
+      bytes: Uint8List.fromList(plane),
       metadata: InputImageMetadata(
-        bytesPerRow: plane.bytesPerRow,
-        size: imageSize,
-        rotation: imageRotation,
-        format: inputImageFormat,
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: rotation,
+        format: format ?? InputImageFormat.yuv_420_888,
+        bytesPerRow: image.planes.first.bytesPerRow,
       ),
     );
-
-    return visionImage;
   }
 
   @override

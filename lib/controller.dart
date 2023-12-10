@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
@@ -20,7 +19,6 @@ class FaceCameraController extends CameraController {
 
   late final StreamController<List<Face>> _inputImageController;
 
-  late final Timer _timer;
   late final FaceDetector _detector;
 
   Stream<FaceState> get stream =>
@@ -61,12 +59,6 @@ class FaceCameraController extends CameraController {
   }
 
   InputImage _visionImage(CameraImage image, CameraDescription description) {
-    final allBytes = WriteBuffer();
-
-    for (final plane in image.planes) {
-      allBytes.putUint8List(plane.bytes);
-    }
-
     final plane = image.planes.first;
 
     final bytes = plane.bytes;
@@ -99,7 +91,6 @@ class FaceCameraController extends CameraController {
     await _detector.close();
     await _inputImageController.close();
 
-    _timer.cancel();
     await super.dispose();
   }
 }

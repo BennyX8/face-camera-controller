@@ -129,6 +129,7 @@ class SingleFaceState extends FaceState {
     required this.x,
     required this.y,
     required this.z,
+    required this.boundingBox,
   }) : super(count: 1);
 
   factory SingleFaceState.fromFace(Face face) {
@@ -136,12 +137,14 @@ class SingleFaceState extends FaceState {
       x: face.headEulerAngleX,
       y: face.headEulerAngleY,
       z: face.headEulerAngleZ,
+      boundingBox: face.boundingBox,
     );
   }
 
   final double? x;
   final double? y;
   final double? z;
+  final Rect boundingBox;
 
   bool get isFaceStaight {
     if (x != null &&

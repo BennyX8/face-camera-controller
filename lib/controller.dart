@@ -9,6 +9,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 class FaceCameraController extends CameraController {
   FaceCameraController({
     required CameraDescription description,
+    this.processDelay = const Duration(milliseconds: 100),
     ResolutionPreset resolutionPreset = ResolutionPreset.high,
     FaceDetectorOptions? faceDetectorOptions,
     super.enableAudio = false,
@@ -19,6 +20,8 @@ class FaceCameraController extends CameraController {
     final options = faceDetectorOptions ?? FaceDetectorOptions();
     _detector = FaceDetector(options: options);
   }
+
+  final Duration processDelay;
 
   late final StreamController<List<Face>> _inputImageController;
   late final FaceDetector _detector;
@@ -50,7 +53,6 @@ class FaceCameraController extends CameraController {
   @override
   Future<void> initialize({
     bool initializeProccessImage = true,
-    Duration delay = const Duration(milliseconds: 100),
   }) async {
     await super.initialize();
 
@@ -58,7 +60,30 @@ class FaceCameraController extends CameraController {
       return;
     }
 
-    await startImageStream((image) => _startImageStream(image, delay));
+    await startImageStream(_processCameraImage);
+  }
+
+  @override
+  Future<void> startVideoRecording({
+    onLatestImageAvailable? onAvailable,
+  }) async {
+    await super.startVideoRecording(
+      onAvailable: (image) {
+        onAvailable?.call(image);
+        _processCameraImage(image);
+      },
+    );
+  }
+
+  @override
+  Future<XFile> stopVideoRecording() async {
+    final file = await super.stopVideoRecording();
+
+    if (!value.isStreamingImages) {
+      await startImageStream(_processCameraImage);
+    }
+
+    return file;
   }
 
   @override
@@ -70,7 +95,7 @@ class FaceCameraController extends CameraController {
     await super.dispose();
   }
 
-  Future<void> _startImageStream(CameraImage image, Duration delay) async {
+  Future<void> _processCameraImage(CameraImage image) async {
     if (!_isChecking) {
       _isChecking = true;
       final visionImage = _inputImageFromCameraImage(image);
@@ -87,7 +112,7 @@ class FaceCameraController extends CameraController {
           _inputImageController.add(faces);
         }
 
-        await Future.delayed(delay);
+        await Future.delayed(processDelay);
       } finally {
         _isChecking = false;
       }

@@ -1,3 +1,7 @@
+## 0.0.4
+
+* fix: dont process when video record start
+
 ## 0.0.3
 
 * fix: dont emit after dispose

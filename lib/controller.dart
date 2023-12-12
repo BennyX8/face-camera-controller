@@ -10,34 +10,42 @@ class FaceCameraController extends CameraController {
   FaceCameraController({
     required CameraDescription description,
     ResolutionPreset resolutionPreset = ResolutionPreset.high,
+    FaceDetectorOptions? faceDetectorOptions,
     super.enableAudio = false,
     super.imageFormatGroup,
   }) : super(description, resolutionPreset) {
     _inputImageController = StreamController.broadcast();
 
-    final options = FaceDetectorOptions();
+    final options = faceDetectorOptions ?? FaceDetectorOptions();
     _detector = FaceDetector(options: options);
   }
 
   late final StreamController<List<Face>> _inputImageController;
   late final FaceDetector _detector;
+
   bool _isDisposed = false;
+  bool _isChecking = false;
 
-  Stream<FaceState> get stream =>
-      _inputImageController.stream.transform(StreamTransformer.fromHandlers(
-        handleData: (faces, sink) {
-          sink.add(switch (faces.length) {
-            0 => const EmptyFaceState(),
-            1 => SingleFaceState.fromFace(faces.first),
-            _ => MultiFaceState(
-                count: faces.length,
-                faces: [...faces.map(SingleFaceState.fromFace)],
-              ),
-          });
-        },
-      ));
+  Stream<FaceState> get stream => _inputImageController.stream.transform(
+        StreamTransformer.fromHandlers(
+          handleData: (faces, sink) {
+            sink.add(
+              switch (faces.length) {
+                0 => const EmptyFaceState(),
+                1 => SingleFaceState.fromFace(faces.first),
+                _ => MultiFaceState(
+                    count: faces.length,
+                    faces: [...faces.map(SingleFaceState.fromFace)],
+                  ),
+              },
+            );
+          },
+        ),
+      );
 
-  var isChecking = false;
+  Future<List<Face>> processImage(InputImage inputImage) async {
+    return _detector.processImage(inputImage);
+  }
 
   @override
   Future<void> initialize({
@@ -50,29 +58,40 @@ class FaceCameraController extends CameraController {
       return;
     }
 
-    await startImageStream((image) async {
-      if (!isChecking) {
-        isChecking = true;
-        final visionImage = _inputImageFromCameraImage(image);
+    await startImageStream((image) => _startImageStream(image, delay));
+  }
 
-        if (visionImage == null) {
-          isChecking = false;
-          return;
-        }
+  @override
+  Future<void> dispose() async {
+    await _detector.close();
+    await _inputImageController.close();
 
-        try {
-          final faces =
-              await Future.microtask(() => _detector.processImage(visionImage));
-          if (!_isDisposed) {
-            _inputImageController.add(faces);
-          }
+    _isDisposed = true;
+    await super.dispose();
+  }
 
-          await Future.delayed(delay);
-        } finally {
-          isChecking = false;
-        }
+  Future<void> _startImageStream(CameraImage image, Duration delay) async {
+    if (!_isChecking) {
+      _isChecking = true;
+      final visionImage = _inputImageFromCameraImage(image);
+
+      if (visionImage == null) {
+        _isChecking = false;
+        return;
       }
-    });
+
+      try {
+        final faces = await Future.microtask(() => processImage(visionImage));
+
+        if (!_isDisposed) {
+          _inputImageController.add(faces);
+        }
+
+        await Future.delayed(delay);
+      } finally {
+        _isChecking = false;
+      }
+    }
   }
 
   InputImage? _inputImageFromCameraImage(CameraImage image) {
@@ -94,15 +113,6 @@ class FaceCameraController extends CameraController {
         bytesPerRow: image.planes.first.bytesPerRow,
       ),
     );
-  }
-
-  @override
-  Future<void> dispose() async {
-    await _detector.close();
-    await _inputImageController.close();
-
-    _isDisposed = true;
-    await super.dispose();
   }
 }
 

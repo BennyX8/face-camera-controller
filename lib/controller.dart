@@ -66,7 +66,17 @@ class FaceCameraController extends CameraController {
   @override
   Future<void> startVideoRecording({
     onLatestImageAvailable? onAvailable,
+    bool imageStream = false,
   }) async {
+    if (value.isStreamingImages) {
+      await stopImageStream();
+    }
+
+    if (!imageStream) {
+      await super.startVideoRecording(onAvailable: onAvailable);
+      return;
+    }
+
     await super.startVideoRecording(
       onAvailable: (image) {
         onAvailable?.call(image);
@@ -76,10 +86,10 @@ class FaceCameraController extends CameraController {
   }
 
   @override
-  Future<XFile> stopVideoRecording() async {
+  Future<XFile> stopVideoRecording({bool imageStream = false}) async {
     final file = await super.stopVideoRecording();
 
-    if (!value.isStreamingImages) {
+    if (!value.isStreamingImages && imageStream) {
       await startImageStream(_processCameraImage);
     }
 

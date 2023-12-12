@@ -20,8 +20,8 @@ class FaceCameraController extends CameraController {
   }
 
   late final StreamController<List<Face>> _inputImageController;
-
   late final FaceDetector _detector;
+  bool _isDisposed = false;
 
   Stream<FaceState> get stream =>
       _inputImageController.stream.transform(StreamTransformer.fromHandlers(
@@ -63,7 +63,10 @@ class FaceCameraController extends CameraController {
         try {
           final faces =
               await Future.microtask(() => _detector.processImage(visionImage));
-          _inputImageController.add(faces);
+          if (!_isDisposed) {
+            _inputImageController.add(faces);
+          }
+
           await Future.delayed(delay);
         } finally {
           isChecking = false;
@@ -98,6 +101,7 @@ class FaceCameraController extends CameraController {
     await _detector.close();
     await _inputImageController.close();
 
+    _isDisposed = true;
     await super.dispose();
   }
 }

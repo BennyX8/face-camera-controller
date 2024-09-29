@@ -1,3 +1,11 @@
+## 0.0.6
+
+* upgrade packages
+
+## 0.0.5
+
+* refactor: add option to dont start image stream in video record
+
 ## 0.0.4
 
 * fix: dont process when video record start

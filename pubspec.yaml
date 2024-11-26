@@ -1,6 +1,6 @@
 name: face_camera_controller
 description: Upgrade your Flutter camera app with seamless face detection. This camera controller simplifies real-time face recognition integration for an enhanced user experience.
-version: 0.0.6
+version: 0.0.7
 repository: https://github.com/amir1430/face-camera-controller
 
 environment:
